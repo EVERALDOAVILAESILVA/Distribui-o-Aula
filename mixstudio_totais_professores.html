@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Totais por Professor — Interativo</title>
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { font-size: 1.4rem; }
+    .container { max-width: 1100px; margin: auto; }
+    #chartContainer { width: 100%; height: 420px; margin-bottom: 20px; }
+    table.dataTable tbody tr td { vertical-align: middle; }
+    .top-actions { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Totais por Professor — Distribuição de Aulas (2026)</h1>
+    <p>Interativo: pesquise, ordene e copie. Use o gráfico para visualizar os professores com mais aulas.</p>
+
+    <div class="top-actions">
+      <label>Mostrar top
+        <select id="topN">
+          <option>10</option>
+          <option>20</option>
+          <option selected>50</option>
+          <option>100</option>
+          <option>Todos</option>
+        </select>
+      </label>
+      <button id="downloadCsv">Baixar CSV</button>
+      <button id="downloadExcel">Baixar Excel</button>
+    </div>
+
+    <div id="chartContainer">
+      <canvas id="barChart"></canvas>
+    </div>
+
+    <table id="totaisTable" class="display" style="width:100%">
+      <thead>
+        <tr>
+          <th>Professor</th>
+          <th>Total de Aulas</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Dependências -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <script>
+    // Dados injetados
+    const data = [];
+
+    // Preencher a tabela
+    $(document).ready(function() {
+      const table = $('#totaisTable').DataTable({
+        data: data,
+        columns: [
+          { data: 'Professor' },
+          { data: 'Total de Aulas', render: $.fn.dataTable.render.number( '.', ',', 0, '' ) }
+        ],
+        pageLength: 25,
+        order: [[1, 'desc']],
+        language: {
+          url: 'https://cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json'
+        }
+      });
+
+      // Função para desenhar gráfico com top N
+      function drawChart(n) {
+        let sorted = data.slice().sort((a,b) => b['Total de Aulas'] - a['Total de Aulas']);
+        let subset;
+        if (n === 'Todos') subset = sorted;
+        else subset = sorted.slice(0, Number(n));
+        const labels = subset.map(d => d.Professor);
+        const values = subset.map(d => d['Total de Aulas']);
+        if (window.myChart) window.myChart.destroy();
+        const ctx = document.getElementById('barChart').getContext('2d');
+        window.myChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{ label: 'Total de Aulas', data: values }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: { ticks: { autoSkip: false } },
+              y: { beginAtZero: true }
+            },
+            plugins: { legend: { display: false } }
+          }
+        });
+      }
+
+      // Inicializar chart
+      drawChart($('#topN').val());
+
+      // Atualizar ao mudar topN
+      $('#topN').on('change', function() {
+        const v = $(this).val();
+        drawChart(v);
+      });
+
+      // Função: baixar CSV
+      $('#downloadCsv').on('click', function() {
+        let csv = 'Professor,Total de Aulas\n';
+        data.forEach(r => csv += `"${r.Professor.replace(/"/g,'""')}",${r['Total de Aulas']}\n`);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'totais_por_professor.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+
+      // Função: baixar Excel (gera CSV com extensão xls, simples)
+      $('#downloadExcel').on('click', function() {
+        let csv = 'Professor,Total de Aulas\n';
+        data.forEach(r => csv += `"${r.Professor.replace(/"/g,'""')}",${r['Total de Aulas']}\n`);
+        const blob = new Blob([csv], { type: 'application/vnd.ms-excel' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'totais_por_professor.xls';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+
+    });
+  </script>
+</body>
+</html>
